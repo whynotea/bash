@@ -1,0 +1,253 @@
+#!/bin/bash
+#==============================================================================
+# Global constants
+#==============================================================================
+# A list of useful constants
+bin_name=$(basename "$0")
+USER="whynotea"
+#------------------------------------------------------------------------------
+
+#==============================================================================
+# Sourced Functions
+#==============================================================================
+# Try to avoid sourcing other libraries from within a library.
+#------------------------------------------------------------------------------
+
+#==============================================================================
+# Library Functions
+#==============================================================================
+function whynotea_script {
+  #============================================================================
+  # Default values
+  #============================================================================
+  local status=0 #Explicitly set exit status. Avoid using last commands. 
+  local IFS=$' \t\n' 
+
+  local verbose=false #Assume verbose output. 
+  #----------------------------------------------------------------------------
+
+  #============================================================================
+  # Usage 
+  #============================================================================
+  Usage()
+  {
+    IFS=$'\t' read -r -d '%' output <<-EOF
+		   $bin_name
+		   ---
+		   usage: $bin_name [options] <command> [<args>]
+
+		   Description: 
+		   A bootstrap script for a wsl2 linux disto
+
+		   Options:
+		    [-h] - print this usage statement
+		    [-v] - print more verbose output
+		    [-u <user>] - user to configure during bootstrap
+		EOF
+    echo "$output" >&2
+  }
+  #----------------------------------------------------------------------------
+
+  #============================================================================
+  # Get Options
+  #============================================================================
+  local OPTIND # Needed to call getopts multiple times within a script
+  while getopts ":hvu:" opt; do
+    case $opt in
+      h) 
+        Usage 
+        exit 1
+        ;;
+      v) 
+        verbose=true
+        ;;
+      u) 
+        USER="$OPTARG"
+        ;;
+      \?)
+        echo "Invalid option: -$OPTARG." >&2
+        Usage
+        exit 1
+        ;;
+      :)
+        echo "Option -$OPTARG requires an argument." >&2
+        exit 1
+        ;;
+     esac
+  done
+  shift "$((OPTIND-1))"
+  #----------------------------------------------------------------------------
+
+  #============================================================================
+  # Systemd check
+  #============================================================================
+  check_systemd()
+  {
+    ps -ef | grep -v grep | grep -q systemd
+    if [[ $? -gt 0 ]]; then
+      echo "Systemd is not running on this distro." >&2
+      exit 1
+    else
+      echo "Systemd installed." >&2
+    fi
+  }
+  #----------------------------------------------------------------------------
+
+  #============================================================================
+  # Install pkgs
+  #============================================================================
+  install_pkgs()
+  {
+    dnf -y groupinstall "C Development Tools and Libraries" "Development Tools"
+    dnf -y install util-linux-user iptables-nft man man-pages passwd\
+           cracklib-dicts util-linux procps-ng iputils iproute findutils\
+           ncurses vim-X11 tmux tmux-powerline hostname git zsh\
+           langpacks-en_GB conntrack fio parted cri-o slirp4netns\
+           openssh-server net-tools bind-utils wireguard-tools wget neovim\
+           python3-neovim xz ruby podman-compose nodejs-bash-language-server
+  }
+  #----------------------------------------------------------------------------
+
+  #============================================================================
+  # Configure root user
+  #============================================================================
+  configure_root_user()
+  {
+    # The following allows root to use the whynotea bootstrap if running 'sudo zsh'
+    sed -i '/Defaults \+always_set_home/s/^/#/' /etc/sudoers
+    sed -i '/# \+Defaults \+env_keep += "HOME"/s/^# //' /etc/sudoers
+  }
+  #----------------------------------------------------------------------------
+  #============================================================================
+  # Configure user zsh
+  #============================================================================
+  configure_user_zsh()
+  {
+    zshconfig=$( cat <<'EOF'
+# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
+# Initialization code that may require console input (password prompts, [y/n]
+# confirmations, etc.) must go above this block; everything else may go below.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
+source $HOME/.bootstrap/bootstrap
+
+# To customize prompt, run 'p10k configure' or edit ~/.p10k.zsh.
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+
+EOF
+)
+    su $USER <<EOF
+echo "$zshconfig" > /home/${USER}/.zshrc
+EOF
+    echo "source /home/${USER}/.bootstrap/bootstrap" > /home/${USER}/.zlogin
+  }
+  #----------------------------------------------------------------------------
+  #============================================================================
+  # Configure user git
+  #============================================================================
+  configure_user_git()
+  {
+    gitconfig=$( cat <<'EOF'
+[user]
+  email = Tony.Liam.Merrigan@gmail.com
+  name = Tony Liam Merrigan
+[diff]
+  tool = whynotea
+[difftool "whynotea"]
+  cmd = vimx -b -u $BOOTSTRAP_VIM/vimrc -d $LOCAL $REMOTE $MERGED
+[pull]
+        rebase = true
+[init]
+        defaultBranch = main
+[filter "lfs"]
+        clean = git-lfs clean -- %f
+        smudge = git-lfs smudge -- %f
+        process = git-lfs filter-process
+        required = true
+[core]
+        autocrlf = input
+EOF
+)
+    su $USER <<EOF
+echo "$gitconfig" > /home/${USER}/.gitconfig
+EOF
+  }
+  #----------------------------------------------------------------------------
+  #============================================================================
+  # Configure user env
+  #============================================================================
+  configure_user_shell()
+  {
+    su $USER <<'EOF'
+git clone https://github.com/whynotea/bootstrap.git $HOME/.bootstrap
+git clone https://github.com/whynotea/nvim.git $HOME/.bootstrap/include/bash
+git clone --recurse-submodules https://github.com/whynotea/zsh.git $HOME/.bootstrap/include/zsh
+git clone https://github.com/whynotea/tmux.git $HOME/.bootstrap/include/tmux
+git clone https://github.com/whynotea/nvim.git $HOME/.bootstrap/include/nvim
+chsh -s /bin/zsh
+gem install tmuxinator
+EOF
+  }
+  #----------------------------------------------------------------------------
+  #============================================================================
+  # Configure user dev env
+  #============================================================================
+  configure_user_dev_env()
+  {
+    echo -e "Installing devtools"
+    
+    echo -e "Installing golang"
+    # GOLANG
+    curl -LO https://go.dev/dl/go1.22.2.linux-amd64.tar.gz
+    rm -rf /usr/local/go && tar -C /usr/local -xzf go1.22.2.linux-amd64.tar.gz
+    
+    echo -e "Installing nodejs"
+    # NODEJS
+    VERSION=v20.12.2
+    DISTRO=linux-x64
+    curl -LO https://nodejs.org/dist/$VERSION/node-$VERSION-$DISTRO.tar.xz
+    mkdir -p /usr/local/lib/nodejs
+    tar -xJvf node-$VERSION-$DISTRO.tar.xz -C /usr/local/lib/nodejs
+    ln -s /usr/local/lib/nodejs/node-$VERSION-$DISTRO /usr/local/lib/nodejs/nodejs-latest
+    
+    runuser -l $USER -c 'npm install -g @devcontainers/cli'
+
+    echo -e "Installing wails"
+    dnf install -y gtk3-devel webkit2gtk4.0-devel upx
+    runuser -l $USER -c 'go install github.com/wailsapp/wails/v2/cmd/wails@latest'
+    echo -e "Finished installing wails"
+
+    echo -e "Finished installing devtools"
+  }
+  #----------------------------------------------------------------------------
+  #============================================================================
+  # Configure user
+  #============================================================================
+  configure_user()
+  {
+    configure_user_zsh
+    configure_user_git
+    configure_user_shell
+    configure_user_dev_env
+  }
+  #----------------------------------------------------------------------------
+  #============================================================================
+  # Function Main
+  #============================================================================
+  if [[ $verbose == true ]]; then
+    echo "Running with verbose output"
+  fi
+
+  echo "Installing user $USER"
+  check_systemd
+  install_pkgs
+  configure_root_user
+  configure_user
+
+  return $status
+  #----------------------------------------------------------------------------
+}
+whynotea_script "$@"
+#------------------------------------------------------------------------------
