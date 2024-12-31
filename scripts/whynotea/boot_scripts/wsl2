@@ -84,11 +84,11 @@ function whynotea_script {
   check_systemd()
   {
     ps -ef | grep -v grep | grep -q systemd
-    if [[ $? -gt 0 ]]; then
-      echo "Systemd is not running on this distro." >&2
-      exit 1
+    if [[ $? -ne 0 ]]; then
+      echo "Systemd is not running on this distro, safe to continue." >&2
     else
-      echo "Systemd installed." >&2
+      echo "Systemd is running, can't proceed with wsl2 boot." >&2
+      exit 1
     fi
   }
   #----------------------------------------------------------------------------
@@ -123,7 +123,7 @@ function whynotea_script {
   #============================================================================
   configure_user_zsh()
   {
-    zshconfig=$( cat <<'EOF'
+    cat <<'EOF' > /home/${USER}/.zshrc
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
@@ -137,11 +137,9 @@ source $HOME/.bootstrap/bootstrap
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
 EOF
-)
-    su $USER <<EOF
-echo "$zshconfig" > /home/${USER}/.zshrc
-EOF
     echo "source /home/${USER}/.bootstrap/bootstrap" > /home/${USER}/.zlogin
+    chown ${USER}:${USER} /home/${USER}/.zshrc
+    chown ${USER}:${USER} /home/${USER}/.zlogin
   }
   #----------------------------------------------------------------------------
   #============================================================================
@@ -149,7 +147,7 @@ EOF
   #============================================================================
   configure_user_git()
   {
-    gitconfig=$( cat <<'EOF'
+    cat <<'EOF' > /home/${USER}/.gitconfig
 [user]
   email = Tony.Liam.Merrigan@gmail.com
   name = Tony Liam Merrigan
@@ -169,10 +167,7 @@ EOF
 [core]
         autocrlf = input
 EOF
-)
-    su $USER <<EOF
-echo "$gitconfig" > /home/${USER}/.gitconfig
-EOF
+    chown ${USER}:${USER} /home/${USER}/.gitconfig
   }
   #----------------------------------------------------------------------------
   #============================================================================
@@ -182,13 +177,13 @@ EOF
   {
     su $USER <<'EOF'
 git clone https://github.com/whynotea/bootstrap.git $HOME/.bootstrap
-git clone https://github.com/whynotea/nvim.git $HOME/.bootstrap/include/bash
+git clone https://github.com/whynotea/bash.git $HOME/.bootstrap/include/bash
 git clone --recurse-submodules https://github.com/whynotea/zsh.git $HOME/.bootstrap/include/zsh
 git clone https://github.com/whynotea/tmux.git $HOME/.bootstrap/include/tmux
 git clone https://github.com/whynotea/nvim.git $HOME/.bootstrap/include/nvim
-chsh -s /bin/zsh
 gem install tmuxinator
 EOF
+    chsh -s /bin/zsh $USER
   }
   #----------------------------------------------------------------------------
   #============================================================================
