@@ -49,7 +49,7 @@ function whynotea_script {
 		Command:
 		EOF
     echo "$output" >&2
-    for f in $(find "$SCRIPT_PATH" -maxdepth 1 -type f,l -executable | sort) ;
+    for f in $(find "$SCRIPT_PATH" -maxdepth 1 \( -type f -o -type l \) -executable | sort) ;
     do
       "$f" "-h"
     done

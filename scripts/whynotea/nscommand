@@ -4,43 +4,12 @@
 #==============================================================================
 # A list of useful constants
 bin_name=$(basename "$0")
-bin_dir=$(dirname "$0")
-SCRIPT_PATH="$bin_dir/${bin_name,,}_scripts"
 #------------------------------------------------------------------------------
-
-#============================================================================
-# Usage 
-#============================================================================
-Usage()
-{
-  IFS=$'\t' read -r -d '%' output <<-EOF
-		   $bin_name
-		   ---
-		   usage: $bin_name [options] <command> [<args>]
-
-		   Description:
-		   An accessor script to conveniently call any ${bin_name} scripts
-
-		   Options:
-		     [-h] - print this usage statement
-		     [-v] - print more verbose output
-
-		   Command:
-		EOF
-    echo "$output" >&2
-    for f in $(find "$SCRIPT_PATH" -maxdepth 1 \( -type f -o -type l \) -executable | sort) ;
-    do
-      eval "$f -h"
-    done
-}
-#----------------------------------------------------------------------------
 
 #==============================================================================
 # Sourced Functions
 #==============================================================================
 # Try to avoid sourcing other libraries from within a library.
-# shellcheck source=../lib/colours.sh
-source "$BOOTSTRAP_BASH/lib/colours.sh"
 #------------------------------------------------------------------------------
 
 #==============================================================================
@@ -57,16 +26,37 @@ function whynotea_script {
   #----------------------------------------------------------------------------
 
   #============================================================================
+  # Usage 
+  #============================================================================
+  Usage()
+  {
+    IFS=$'\t' read -r -d '%' output <<-EOF
+		   $bin_name
+		   ---
+		   usage: $bin_name [options] <command> [<args>]
+
+		   Description: 
+		   An example of an L2 script, copy and edit as required
+
+		   Options:
+		    [-h] - print this usage statement
+		    [-v] - print more verbose output
+		EOF
+    echo "$output" >&2
+  }
+  #----------------------------------------------------------------------------
+
+  #============================================================================
   # Get Options
   #============================================================================
   local OPTIND # Needed to call getopts multiple times within a script
   while getopts ":hv" opt; do
     case $opt in
-      h)
+      h) 
         Usage 
         exit 1
         ;;
-      v)
+      v) 
         verbose=true
         ;;
       \?)
@@ -86,15 +76,13 @@ function whynotea_script {
   #============================================================================
   # Function Main
   #============================================================================
-  if [[ "$#" -ge 1 ]] ; then
-    script=$SCRIPT_PATH/$1
-    shift
-    if [[ $verbose == true ]]; then
-      echo "$script $*"
-    fi
-    "$script" "$@"
+  if [[ $verbose == true ]]; then
+    echo "Running with verbose output"
+  fi
+  if [ "$#" -lt 1 ] ; then
+    echo "nscommand [command]"
   else
-    whynotea_script -h
+    WHYNOTEA_WSL_NS=true /usr/local/bin/enterns "$@"
   fi
   return $status
   #----------------------------------------------------------------------------
