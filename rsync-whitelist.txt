@@ -1,0 +1,7 @@
+- .git*
++ bin/***
++ lib/***
++ scripts/***
++ README.md
++ rsync-whitelist.txt
+- *
