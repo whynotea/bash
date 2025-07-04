@@ -1,0 +1,37 @@
+#!/bin/bash
+
+#bash -c "WHYNOTEA_WSL_NS=true /usr/local/bin/enterns podman $*"
+#bash -c "WHYNOTEA_WSL_NS=true /usr/local/bin/enterns podman version --format \'{{json .}}\'"
+# Define the regex:
+# ^          - Start of the string
+# ([^=]+)    - Capture group 1: one or more characters that are not '=' (the key)
+# =          - Literal '='
+# (.*)       - Capture group 2: any characters until the end of the string (the value)
+# $          - End of the string
+regex=".*(\{\{json .\}\}).*"
+
+# Array to store processed arguments
+processed_args=()
+
+# Loop through all provided arguments
+for arg in "$@"; do
+    if [[ "$arg" =~ $regex ]]; then
+        # Argument matches the key=value pattern
+        value="${BASH_REMATCH[1]}"
+
+        # Check if the value is already quoted (simple check for leading/trailing quotes)
+        if [[ "$value" =~ ^[\"'].*[\"']$ ]]; then
+            # Value is already quoted, keep as is
+            processed_args+=("$arg")
+        else
+            # Value is not quoted, wrap it in double quotes
+            processed_args+=("\"\'${value}\'\"")
+        fi
+    else
+        # Argument does not match the regex, keep as is
+        processed_args+=("$arg")
+    fi
+done
+
+#echo "bash -c WHYNOTEA_WSL_NS=true /usr/local/bin/enterns podman ${processed_args[*]}"
+bash -c "WHYNOTEA_WSL_NS=true /usr/local/bin/enterns podman \"${processed_args[*]}\""
