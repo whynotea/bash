@@ -33,5 +33,6 @@ for arg in "$@"; do
     fi
 done
 
-#echo "bash -c WHYNOTEA_WSL_NS=true /usr/local/bin/enterns podman ${processed_args[*]}"
-bash -c "WHYNOTEA_WSL_NS=true /usr/local/bin/enterns podman \"${processed_args[*]}\""
+#echo "bash -c WHYNOTEA_WSL_NS=true /usr/local/bin/enterns podman ${processed_args[*]}" >&2
+# bash -c "WHYNOTEA_WSL_NS=true /usr/local/bin/enterns podman \"${processed_args[*]}\""
+WHYNOTEA_WSL_NS=true /usr/local/bin/enterns podman "${processed_args[@]}"
