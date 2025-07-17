@@ -123,22 +123,26 @@ function whynotea_script {
   #============================================================================
   configure_user_zsh()
   {
-    cat <<'EOF' > /home/${USER}/.zshrc
-# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
-# Initialization code that may require console input (password prompts, [y/n]
-# confirmations, etc.) must go above this block; everything else may go below.
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-fi
-
-source $HOME/.bootstrap/bootstrap
-
-# To customize prompt, run 'p10k configure' or edit ~/.p10k.zsh.
-[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
-
+    rm -f $HOME/.zshenv
+    cat <<'EOF' > /home/${USER}/.zshenv
+	ZDOTDIR=$HOME/.bootstrap 
+	source "$ZDOTDIR/.zshenv"
 EOF
-    echo "source /home/${USER}/.bootstrap/bootstrap" > /home/${USER}/.zlogin
+    rm -f $HOME/.zprofile
+    cat <<'EOF' > /home/${USER}/.zprofile
+	source $ZDOTDIR/.zprofile
+EOF
+    rm -f $HOME/.zshrc
+    cat <<'EOF' > /home/${USER}/.zshrc
+	source $BOOTSTRAP/.zshrc
+EOF
+    rm -f $HOME/.zlogin
+    cat <<'EOF' > /home/${USER}/.zlogin
+	source $BOOTSTRAP/.zshrc
+EOF
+    chown ${USER}:${USER} /home/${USER}/.zshenv
     chown ${USER}:${USER} /home/${USER}/.zshrc
+    chown ${USER}:${USER} /home/${USER}/.zprofile
     chown ${USER}:${USER} /home/${USER}/.zlogin
   }
   #----------------------------------------------------------------------------
@@ -176,11 +180,16 @@ EOF
   configure_user_shell()
   {
     su $USER <<'EOF'
-git clone https://github.com/whynotea/bootstrap.git $HOME/.bootstrap
-git clone https://github.com/whynotea/bash.git $HOME/.bootstrap/include/bash
-git clone --recurse-submodules https://github.com/whynotea/zsh.git $HOME/.bootstrap/include/zsh
-git clone https://github.com/whynotea/tmux.git $HOME/.bootstrap/include/tmux
-git clone https://github.com/whynotea/nvim.git $HOME/.bootstrap/include/nvim
+git clone https://github.com/whynotea/bootstrap.git $HOME/github/bootstrap
+git clone https://github.com/whynotea/bash.git $HOME/github/bash
+git clone --recurse-submodules https://github.com/whynotea/zsh.git $HOME/github/zsh
+git clone https://github.com/whynotea/tmux.git $HOME/github/tmux
+git clone https://github.com/whynotea/nvim.git $HOME/github/nvim
+ln -s $HOME/github/bootstrap $HOME/.bootstrap
+ln -s $HOME/github/bash $HOME/github/bootstrap/include/bash
+ln -s $HOME/github/zsh $HOME/github/bootstrap/include/zsh
+ln -s $HOME/github/tmux $HOME/github/bootstrap/include/tmux
+ln -s $HOME/github/nvim $HOME/github/bootstrap/include/nvim
 gem install tmuxinator
 EOF
     chsh -s /bin/zsh $USER
@@ -222,10 +231,104 @@ EOF
   #============================================================================
   configure_user()
   {
-    configure_user_zsh
-    configure_user_git
+    #configure_user_zsh
+    #configure_user_git
     configure_user_shell
-    configure_user_dev_env
+    #configure_user_dev_env
+  }
+  #----------------------------------------------------------------------------
+  #============================================================================
+  # Configure enterns
+  #============================================================================
+  configure_enterns()
+  {
+    rm -f /usr/local/bin/enterns
+    cat <<'EOF' > /usr/local/bin/enterns
+#!/bin/bash
+if [[ -z "$WHYNOTEA_WSL_NS" ]]; then
+  exit 0
+fi
+SYSDPID=`ps -eo cmd,pid | grep -m 1 ^/lib/systemd/systemd | awk '{print $2}'`
+if [ ! -z "$SYSDPID" ] && [ "$SYSDPID" != "1" ]; then
+        NSENTER=("nsenter" "-m" "-p" "-t" "$SYSDPID" "--wd=$PWD")
+
+        if [ "$UID" != "0" ]; then
+                NSENTER=("sudo" "${NSENTER[@]}")
+                if [ "$#" != "0" ]; then
+                        NSENTER+=("sudo" "-u" "$USER")
+                else
+                        NSENTER+=("su" "-l" "$USER")
+                fi
+        fi
+        "${NSENTER[@]}" "XDG_CACHE_HOME=/home/whynotea/.bootstrap/.xdg/cache"\
+                        "XDG_CONFIG_HOME=/home/whynotea/.bootstrap/.xdg/config"\
+                        "XDG_DATA_HOME=/home/whynotea/.bootstrap/.xdg/data"\
+                        "$@"
+fi
+EOF
+    chmod +x /usr/local/bin/enterns
+  }
+  #============================================================================
+  # Configure /root/bootstrap
+  #============================================================================
+  configure_root_bootstrap()
+  {
+    rm -f /root/bootstrap
+    cat <<'EOF' > /root/bootstrap
+#!/bin/bash
+
+# Exit if systemd is already running in this context (e.g., if this script is called by systemd itself)
+ps -ef | grep -v grep | grep -q systemd && exit 0
+
+# 1. Ensure the root filesystem in the *parent* (main) namespace is shared.
+# This is crucial for propagation to work between the main namespace and the new one.
+# If /tmp is a separate mount (e.g., a dedicated tmpfs), you might also need:
+# sudo mount --make-shared /tmp
+# However, marking / shared is usually sufficient for /tmp if it's part of the rootfs.
+# We need to do this as root, hence the sudo.
+sudo mount --make-shared /
+
+# Allow a moment for the mount propagation change to take effect
+sleep 0.1
+
+# 2. Start a new systemd instance in a new set of namespaces
+nohup sudo unshare \
+  --kill-child \
+  --fork \
+  --pid \
+  --mount \
+  --mount-proc \
+  --propagation shared \
+  /lib/systemd/systemd >/dev/null 2>&1 &
+
+sleep 0.1
+EOF
+    chmod +x /root/bootstrap
+    rm -f /etc/wslmotd
+  }
+  #----------------------------------------------------------------------------
+  #============================================================================
+  # Configure /etc/profile.d/enterns.sh
+  #============================================================================
+  configure_profile_enterns()
+  {
+    rm -f /etc/profile.d/enterns.sh
+    cat <<'EOF' > /etc/profile.d/enterns.sh
+SYSDPID=`ps -eo cmd,pid | grep -m 1 ^/lib/systemd/systemd | awk '{print $2}'`
+if [ ! -z "$SYSDPID" ] && [ "$SYSDPID" != "1" ]; then
+	/usr/local/bin/enterns
+fi
+EOF
+  }
+  #----------------------------------------------------------------------------
+  #============================================================================
+  # Configure ns
+  #============================================================================
+  configure_ns()
+  {
+    configure_enterns
+    configure_root_bootstrap
+    configure_profile_enterns
   }
   #----------------------------------------------------------------------------
   #============================================================================
@@ -236,10 +339,11 @@ EOF
   fi
 
   echo "Installing user $USER"
-  check_systemd
-  install_pkgs
-  configure_root_user
+  #check_systemd
+  #install_pkgs
+  #configure_root_user
   configure_user
+  #configure_ns
 
   return $status
   #----------------------------------------------------------------------------
