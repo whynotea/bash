@@ -169,7 +169,17 @@ EOF
         process = git-lfs filter-process
         required = true
 [core]
-        autocrlf = input
+  autocrlf = input
+  excludesFile = ~/.gitignore
+[alias]
+  ignored = !git ls-files -v | grep "^[[:lower:]]"
+  ignorefiles = !git update-index --assume-unchanged
+  unignorefiles = !git update-index --no-assume-unchanged
+
+[credential]
+	helper = /mnt/c/Program\\ Files\\ \\(x86\\)/Git\\ Credential\\ Manager/git-credential-manager.exe
+[credential "github.com"]
+	useHttpPath = true
 EOF
     chown ${USER}:${USER} /home/${USER}/.gitconfig
   }
@@ -179,17 +189,17 @@ EOF
   #============================================================================
   configure_user_shell()
   {
-    su $USER <<'EOF'
-git clone https://github.com/whynotea/bootstrap.git $HOME/github/bootstrap
-git clone https://github.com/whynotea/bash.git $HOME/github/bash
-git clone --recurse-submodules https://github.com/whynotea/zsh.git $HOME/github/zsh
-git clone https://github.com/whynotea/tmux.git $HOME/github/tmux
-git clone https://github.com/whynotea/nvim.git $HOME/github/nvim
-ln -s $HOME/github/bootstrap $HOME/.bootstrap
-ln -s $HOME/github/bash $HOME/github/bootstrap/include/bash
-ln -s $HOME/github/zsh $HOME/github/bootstrap/include/zsh
-ln -s $HOME/github/tmux $HOME/github/bootstrap/include/tmux
-ln -s $HOME/github/nvim $HOME/github/bootstrap/include/nvim
+    su "$USER" <<'EOF'
+(cd "$HOME/github/bootstrap" && git pull) || git clone "https://github.com/whynotea/bootstrap.git" "$HOME/github/bootstrap"
+(cd "$HOME/github/bash" && git pull) || git clone "https://github.com/whynotea/bash.git" "$HOME/github/bash"
+(cd "$HOME/github/zsh" && git pull) || git clone --recurse-submodules "https://github.com/whynotea/zsh.git" "$HOME/github/zsh"
+(cd "$HOME/github/tmux" && git pull) || git clone "https://github.com/whynotea/tmux.git" "$HOME/github/tmux"
+(cd "$HOME/github/nvim" && git pull) || git clone "https://github.com/whynotea/nvim.git" "$HOME/github/nvim"
+rm -f $HOME/.bootstrap && ln -s $HOME/github/bootstrap $HOME/.bootstrap
+rm -f $HOME/github/bootstrap/include/bash && ln -s $HOME/github/bash $HOME/github/bootstrap/include/bash
+rm -f $HOME/github/bootstrap/include/zsh && ln -s $HOME/github/zsh $HOME/github/bootstrap/include/zsh
+rm -f $HOME/github/bootstrap/include/tmux && ln -s $HOME/github/tmux $HOME/github/bootstrap/include/tmux
+rm -f $HOME/github/bootstrap/include/nvim && ln -s $HOME/github/nvim $HOME/github/bootstrap/include/nvim
 gem install tmuxinator
 EOF
     chsh -s /bin/zsh $USER
@@ -231,8 +241,8 @@ EOF
   #============================================================================
   configure_user()
   {
-    #configure_user_zsh
-    #configure_user_git
+    configure_user_zsh
+    configure_user_git
     configure_user_shell
     #configure_user_dev_env
   }
@@ -340,10 +350,10 @@ EOF
 
   echo "Installing user $USER"
   #check_systemd
-  #install_pkgs
-  #configure_root_user
+  install_pkgs
+  configure_root_user
   configure_user
-  #configure_ns
+  configure_ns
 
   return $status
   #----------------------------------------------------------------------------
