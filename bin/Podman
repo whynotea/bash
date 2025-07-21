@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if [[ -n $WHYNOTEA_WSL_NS ]]; then
+  /usr/bin/podman "$@"
+  return $?
+fi
 #bash -c "WHYNOTEA_WSL_NS=true /usr/local/bin/enterns podman $*"
 #bash -c "WHYNOTEA_WSL_NS=true /usr/local/bin/enterns podman version --format \'{{json .}}\'"
 # Define the regex:
