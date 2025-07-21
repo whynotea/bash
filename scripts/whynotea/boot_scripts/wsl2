@@ -104,7 +104,8 @@ function whynotea_script {
            ncurses vim-X11 tmux tmux-powerline hostname git zsh\
            langpacks-en_GB conntrack fio parted cri-o slirp4netns\
            openssh-server net-tools bind-utils wireguard-tools wget neovim\
-           python3-neovim xz ruby podman-compose nodejs-bash-language-server
+           python3-neovim xz ruby podman-compose nodejs-bash-language-server\
+           rsync
   }
   #----------------------------------------------------------------------------
 
@@ -342,6 +343,76 @@ EOF
   }
   #----------------------------------------------------------------------------
   #============================================================================
+  # Configure tmuxinator
+  #============================================================================
+  configure_tmuxinator()
+  {
+    tmuxinator_dir=/home/whynotea/.bootstrap/.xdg/config/tmuxinator
+    mkdir -p $tmuxinator_dir
+    rm -f $tmuxinator_dir/local.yml
+    cat <<'EOF' > $tmuxinator_dir/local.yml
+# /home/whynotea/.bootstrap/.xdg/config/tmuxinator/local.yml
+
+name: local
+root: ~/
+
+# Optional tmux socket
+# socket_name: foo
+
+# Note that the pre and post options have been deprecated and will be replaced by
+# project hooks.
+
+# Project hooks
+
+# Runs on project start, always
+# on_project_start: command
+
+# Run on project start, the first time
+# on_project_first_start: command
+
+# Run on project start, after the first time
+# on_project_restart: command
+
+# Run on project exit ( detaching from tmux session )
+# on_project_exit: command
+
+# Run on project stop
+# on_project_stop: command
+
+# Runs in each window and pane before window/pane specific commands. Useful for setting up interpreter versions.
+# pre_window: rbenv shell 2.0.0-p247
+
+# Pass command line options to tmux. Useful for specifying a different tmux.conf.
+# tmux_options: -f ~/.tmux.mac.conf
+
+# Change the command to call tmux. This can be used by derivatives/wrappers like byobu.
+# tmux_command: byobu
+
+# Specifies (by name or index) which window will be selected on project startup. If not set, the first window is used.
+# startup_window: editor
+
+# Specifies (by index) which pane of the specified window will be selected on project startup. If not set, the first pane is used.
+# startup_pane: 1
+
+# Controls whether the tmux session should be attached to automatically. Defaults to true.
+# attach: false
+
+windows:
+  - work:
+      layout: tiled
+      # Synchronize all panes of this window, can be enabled before or after the pane commands run.
+      # 'before' represents legacy functionality and will be deprecated in a future release, in favour of 'after'
+      # synchronize: after
+      panes:
+        - 
+        - ns 
+        - 
+        - 
+  - scratch: 
+EOF
+  }
+  #----------------------------------------------------------------------------
+  #============================================================================
   # Function Main
   #============================================================================
   if [[ $verbose == true ]]; then
@@ -354,6 +425,7 @@ EOF
   configure_root_user
   configure_user
   configure_ns
+  configure_tmuxinator
 
   return $status
   #----------------------------------------------------------------------------

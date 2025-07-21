@@ -82,7 +82,7 @@ function whynotea_script {
   if [ "$#" -lt 2 ] ; then
     echo "require: user@remote.host:/path/to/copy /path/to/local/storage"
   else
-    rsync -havzP --stats "$@"
+    rsync -havzP --stats --delete "$@"
   fi
   return $status
   #----------------------------------------------------------------------------
