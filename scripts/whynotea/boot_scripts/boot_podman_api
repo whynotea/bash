@@ -1,0 +1,18 @@
+#!/bin/bash
+
+export XDG_RUNTIME_DIR="/run/user/1000"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+echo "USER: $USER"
+systemctl --user stop podman.socket
+systemctl --user stop podman.service
+systemctl --user disable podman.socket
+systemctl --user daemon-reload
+# Check if the service is already enabled
+if systemctl --user is-enabled podman.socket &>/dev/null; then
+    echo "podman.socket is already enabled."
+else
+    echo "Enabling podman.socket..."
+    systemctl --user enable podman.socket
+fi
+
+systemctl --user start podman.socket

@@ -3,6 +3,7 @@
 # Global constants
 #==============================================================================
 # A list of useful constants
+bin_dir=$(readlink -f "$(dirname "$0")")
 bin_name=$(basename "$0")
 USER="whynotea"
 #------------------------------------------------------------------------------
@@ -413,6 +414,26 @@ EOF
   }
   #----------------------------------------------------------------------------
   #============================================================================
+  # Configure podman api
+  #============================================================================
+  configure_podman()
+  {
+    podman_service_dir=/home/whynotea/.config/systemd/user/podman.service.d
+    mkdir -p $podman_service_dir
+    rm -f $podman_service_dir/override.conf
+    cat <<'EOF' > $podman_service_dir/override.conf
+[Service]
+Delegate=true
+Type=exec
+KillMode=process
+Environment=LOGGING="--log-level=info"
+ExecStart=
+ExecStart=/usr/bin/podman $LOGGING system service --time=0 --root=/home/whynotea/.bootstrap/.xdg/data/containers/storage --runroot=/mnt/wslg/runtime-dir/containers
+EOF
+    runuser -l $USER -c "WHYNOTEA_WSL_NS=true /usr/local/bin/enterns $bin_dir/boot_podman_api"
+  }
+  #----------------------------------------------------------------------------
+  #============================================================================
   # Function Main
   #============================================================================
   if [[ $verbose == true ]]; then
@@ -421,11 +442,12 @@ EOF
 
   echo "Installing user $USER"
   #check_systemd
-  install_pkgs
-  configure_root_user
-  configure_user
-  configure_ns
-  configure_tmuxinator
+  #install_pkgs
+  #configure_root_user
+  #configure_user
+  #configure_ns
+  #configure_tmuxinator
+  configure_podman
 
   return $status
   #----------------------------------------------------------------------------
