@@ -2,7 +2,7 @@
 
 if [[ -n $WHYNOTEA_WSL_NS ]]; then
   /usr/bin/podman "$@"
-  return $?
+  exit $?
 fi
 #bash -c "WHYNOTEA_WSL_NS=true /usr/local/bin/enterns podman $*"
 #bash -c "WHYNOTEA_WSL_NS=true /usr/local/bin/enterns podman version --format \'{{json .}}\'"
